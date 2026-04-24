@@ -1,173 +1,261 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>República: Simulador Político Brasileiro</title>
+    <title>E-Sim Brasil | Simulador Político</title>
     
-    <!-- Font Awesome -->
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gov: {
+                            900: '#0f172a', // Deep dark blue
+                            800: '#1e293b',
+                            700: '#334155',
+                            accent: '#10b981' // Green BR
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Font Awesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Leaflet CSS (Mapa) -->
+
+    <!-- Leaflet JS (Map Engine) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- D3.js (Para renderização do Plenário) -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="bg-gov-900 text-slate-200 h-screen w-screen overflow-hidden flex font-sans selection:bg-gov-accent selection:text-white">
 
-    <!-- TELA 1: CRIAÇÃO DO PARTIDO -->
-    <div id="creation-screen" class="screen active">
-        <div class="creation-modal">
-            <h1><i class="fas fa-landmark"></i> Fundação do Partido</h1>
-            <p>Defina as bases da sua legenda para iniciar a campanha.</p>
-            
-            <div class="form-group">
-                <label>Nome do Partido</label>
-                <input type="text" id="party-name" placeholder="Ex: Partido do Progresso Nacional">
+    <!-- Left Sidebar -->
+    <aside class="w-64 bg-gov-800 border-r border-gov-700 flex flex-col shadow-2xl z-20">
+        <div class="p-6 flex items-center gap-3 border-b border-gov-700">
+            <div class="w-10 h-10 bg-gov-accent rounded-full flex items-center justify-center text-gov-900 shadow-lg shadow-gov-accent/20">
+                <i class="fa-solid fa-flag"></i>
             </div>
-            
-            <div class="form-group">
-                <label>Sigla</label>
-                <input type="text" id="party-sigla" placeholder="Ex: PPN">
+            <div>
+                <h1 class="font-bold text-lg leading-tight tracking-wide">E-Sim Brasil</h1>
+                <p class="text-xs text-slate-400">v1.0.0 Alpha</p>
             </div>
-            
-            <div class="form-group">
-                <label>Espectro Político</label>
-                <select id="party-ideology">
-                    <option value="esquerda">Esquerda</option>
-                    <option value="centro-esquerda">Centro-Esquerda</option>
-                    <option value="centro">Centro</option>
-                    <option value="centro-direita">Centro-Direita</option>
-                    <option value="direita">Direita</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label>Cor Oficial</label>
-                <input type="color" id="party-color" value="#1e3a8a">
-            </div>
-
-            <button id="btn-start-game" class="btn-primary"><i class="fas fa-flag"></i> Iniciar Jornada</button>
         </div>
-    </div>
 
-    <!-- TELA 2: DASHBOARD PRINCIPAL -->
-    <div id="game-screen" class="screen">
+        <nav class="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
+            <button onclick="uiManager.switchView('map')" class="nav-btn active group">
+                <i class="fa-solid fa-map-marked-alt text-lg w-6 group-hover:text-gov-accent transition-colors"></i>
+                <span class="font-medium">Mapa Nacional</span>
+            </button>
+            <button onclick="uiManager.switchView('congress')" class="nav-btn group">
+                <i class="fa-solid fa-landmark text-lg w-6 group-hover:text-gov-accent transition-colors"></i>
+                <span class="font-medium">Congresso Nacional</span>
+            </button>
+            <button onclick="uiManager.switchView('party')" class="nav-btn group">
+                <i class="fa-solid fa-users text-lg w-6 group-hover:text-gov-accent transition-colors"></i>
+                <span class="font-medium">Meu Partido</span>
+            </button>
+            <button onclick="uiManager.switchView('executive')" class="nav-btn group">
+                <i class="fa-solid fa-briefcase text-lg w-6 group-hover:text-gov-accent transition-colors"></i>
+                <span class="font-medium">Executivo</span>
+            </button>
+            <button onclick="uiManager.switchView('stf')" class="nav-btn group">
+                <i class="fa-solid fa-scale-balanced text-lg w-6 group-hover:text-gov-accent transition-colors"></i>
+                <span class="font-medium">Suprema Corte</span>
+            </button>
+            <button onclick="uiManager.switchView('elections')" class="nav-btn group">
+                <i class="fa-solid fa-check-to-slot text-lg w-6 group-hover:text-gov-accent transition-colors"></i>
+                <span class="font-medium">Eleições</span>
+            </button>
+        </nav>
+
+        <div class="p-4 border-t border-gov-700">
+            <label class="block text-xs text-slate-400 mb-2 uppercase tracking-wider font-semibold">Modding & Save</label>
+            <div class="flex gap-2">
+                <button onclick="gameEngine.saveGame()" class="flex-1 bg-gov-700 hover:bg-gov-600 text-xs py-2 rounded-md transition-all" title="Salvar Jogo">
+                    <i class="fa-solid fa-save"></i>
+                </button>
+                <label class="flex-1 bg-gov-700 hover:bg-gov-600 text-xs py-2 rounded-md transition-all cursor-pointer text-center flex items-center justify-center" title="Carregar Mod (JSON)">
+                    <i class="fa-solid fa-file-import"></i>
+                    <input type="file" id="mod-upload" accept=".json" class="hidden" onchange="modSystem.loadMod(event)">
+                </label>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-full relative">
         
-        <!-- Topbar -->
-        <header class="topbar">
-            <div class="party-info">
-                <div id="ui-party-color" class="color-indicator"></div>
-                <h2 id="ui-party-name">Sigla</h2>
-            </div>
-            
-            <div class="game-stats">
-                <div class="stat-box" title="Fundos Partidários">
-                    <i class="fas fa-money-bill-wave" style="color: #4ade80;"></i>
-                    <span id="ui-money">R$ 0,00</span>
+        <!-- Top Bar -->
+        <header class="h-16 bg-gov-800/80 backdrop-blur-md border-b border-gov-700 flex items-center justify-between px-6 z-10 shadow-sm">
+            <div class="flex items-center gap-6">
+                <div class="flex items-center gap-2 text-slate-300">
+                    <i class="fa-regular fa-calendar-alt text-gov-accent"></i>
+                    <span id="ui-date" class="font-mono text-sm font-medium">01 Jan 2026</span>
                 </div>
-                <div class="stat-box" title="Filiados">
-                    <i class="fas fa-users" style="color: #60a5fa;"></i>
-                    <span id="ui-members">0</span>
+                <div class="flex items-center gap-2 text-slate-300">
+                    <i class="fa-solid fa-money-bill-wave text-green-500"></i>
+                    <span id="ui-budget" class="font-mono text-sm font-medium">R$ 1.50 Tri</span>
                 </div>
-                <div class="stat-box" title="Aprovação Nacional">
-                    <i class="fas fa-chart-line" style="color: #f43f5e;"></i>
-                    <span id="ui-approval">0%</span>
+                <div class="flex items-center gap-2 text-slate-300">
+                    <i class="fa-solid fa-chart-line text-blue-400"></i>
+                    <div class="flex flex-col">
+                        <span class="text-[10px] leading-none text-slate-400 uppercase tracking-wider">Aprovação</span>
+                        <span id="ui-approval" class="font-mono text-sm font-medium">45%</span>
+                    </div>
                 </div>
             </div>
 
-            <div class="time-controls">
-                <span id="ui-date">01 Jan 2023</span>
-                <button id="btn-next-turn" class="btn-action"><i class="fas fa-forward"></i> Avançar Semana</button>
+            <div class="flex items-center gap-4">
+                <button onclick="gameEngine.nextTurn()" class="bg-gov-accent hover:bg-emerald-400 text-gov-900 px-4 py-2 rounded-md font-bold text-sm shadow-lg shadow-gov-accent/20 transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-forward-step"></i> Avançar Turno
+                </button>
+                <button class="text-slate-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-cog text-xl"></i>
+                </button>
             </div>
         </header>
 
-        <!-- Main Layout -->
-        <div class="main-layout">
+        <!-- Dynamic Views Container -->
+        <div id="view-container" class="flex-1 relative overflow-hidden">
             
-            <!-- Sidebar Esquerda: Ações -->
-            <aside class="sidebar">
-                <nav class="action-menu">
-                    <button class="menu-btn active" data-target="map-view"><i class="fas fa-map-marked-alt"></i> Mapa Eleitoral</button>
-                    <button class="menu-btn" data-target="campaign-view"><i class="fas class fa-bullhorn"></i> Campanhas</button>
-                    <button class="menu-btn" data-target="finance-view"><i class="fas fa-coins"></i> Finanças</button>
-                    <button class="menu-btn" data-target="law-view"><i class="fas fa-gavel"></i> Projetos de Lei</button>
-                </nav>
-
-                <div class="action-panel">
-                    <h3>Ações Rápidas</h3>
-                    <button class="btn-secondary" onclick="gameEngine.triggerRally()"><i class="fas fa-users-viewfinder"></i> Organizar Comício</button>
-                    <button class="btn-secondary" onclick="gameEngine.fundraise()"><i class="fas fa-hand-holding-dollar"></i> Arrecadação</button>
-                    <button class="btn-secondary" onclick="gameEngine.recruit()"><i class="fas fa-user-plus"></i> Campanha de Filiação</button>
+            <!-- View: MAP -->
+            <div id="view-map" class="view-panel active h-full w-full relative">
+                <div id="leaflet-map" class="h-full w-full z-0"></div>
+                <!-- Map Overlay Controls -->
+                <div class="absolute top-4 right-4 z-[400] bg-gov-800/90 backdrop-blur-md p-4 rounded-lg border border-gov-700 shadow-xl w-64">
+                    <h3 class="font-bold text-sm mb-3 border-b border-gov-700 pb-2"><i class="fa-solid fa-layer-group mr-2"></i>Camadas do Mapa</h3>
+                    <select id="map-layer-select" class="w-full bg-gov-900 border border-gov-700 rounded p-2 text-sm focus:ring-1 focus:ring-gov-accent outline-none" onchange="mapSystem.changeLayer(this.value)">
+                        <option value="political">Domínio Político</option>
+                        <option value="idh">Índice de Desenv. Humano (IDH)</option>
+                        <option value="pib">PIB per Capita</option>
+                        <option value="approval">Aprovação do Governo</option>
+                    </select>
                 </div>
-            </aside>
+            </div>
 
-            <!-- Centro: Mapa e Visualizações -->
-            <main class="content-area">
-                <div id="map"></div>
-                
-                <!-- Sistema de Eventos (Modal oculto) -->
-                <div id="event-modal" class="modal hidden">
-                    <div class="modal-content">
-                        <h2 id="event-title"><i class="fas fa-newspaper"></i> Notícia Urgente</h2>
-                        <p id="event-desc">Descrição do evento aqui.</p>
-                        <div id="event-options" class="event-options">
-                            <!-- Botões gerados via JS -->
+            <!-- View: CONGRESS -->
+            <div id="view-congress" class="view-panel h-full w-full p-8 overflow-y-auto custom-scrollbar bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gov-800 to-gov-900">
+                <div class="max-w-6xl mx-auto flex flex-col gap-6">
+                    <div class="flex justify-between items-end">
+                        <div>
+                            <h2 class="text-3xl font-bold mb-1"><i class="fa-solid fa-landmark text-gov-accent mr-3"></i>Câmara dos Deputados</h2>
+                            <p class="text-slate-400">513 Assentos • Maioria Simples: 257 • PEC: 308</p>
+                        </div>
+                        <button onclick="parliamentSystem.openLawModal()" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded shadow-lg transition-all flex items-center gap-2">
+                            <i class="fa-solid fa-file-signature"></i> Propor Projeto de Lei
+                        </button>
+                    </div>
+
+                    <!-- Hemiciclo D3.js Container -->
+                    <div class="bg-gov-900/50 border border-gov-700 rounded-xl p-8 flex justify-center items-center relative min-h-[400px] shadow-inner">
+                        <div id="hemiciclo-container"></div>
+                        
+                        <!-- Tooltip do Deputado -->
+                        <div id="deputy-tooltip" class="absolute hidden bg-gov-800 border border-gov-600 rounded-lg shadow-2xl p-4 w-64 pointer-events-none z-50 transform -translate-x-1/2 -translate-y-full mt-[-10px]">
+                            <div class="flex items-center gap-3 border-b border-gov-700 pb-2 mb-2">
+                                <div class="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center text-xl overflow-hidden" id="tt-photo">
+                                    <i class="fa-solid fa-user-tie"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-sm leading-tight" id="tt-name">Nome do Deputado</h4>
+                                    <span class="text-xs font-bold px-2 py-0.5 rounded mt-1 inline-block" id="tt-party">PARTIDO</span>
+                                </div>
+                            </div>
+                            <div class="text-xs text-slate-300 space-y-1">
+                                <p><i class="fa-solid fa-compass mr-1"></i> Espectro: <span id="tt-ideology" class="text-white">Centro</span></p>
+                                <p><i class="fa-solid fa-shield-halved mr-1"></i> Integridade: <span id="tt-integrity" class="text-white">80%</span></p>
+                                <p><i class="fa-solid fa-bullhorn mr-1"></i> Oratória: <span id="tt-oratory" class="text-white">65%</span></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Fila de Votação -->
+                    <div class="bg-gov-800 border border-gov-700 rounded-xl p-6">
+                        <h3 class="font-bold text-lg mb-4 border-b border-gov-700 pb-2"><i class="fa-solid fa-gavel mr-2"></i>Pauta de Votações</h3>
+                        <div id="voting-queue" class="space-y-3">
+                            <!-- Gerado dinamicamente -->
+                            <p class="text-sm text-slate-400 italic text-center py-4">Nenhum projeto em pauta no momento.</p>
                         </div>
                     </div>
                 </div>
-            </main>
+            </div>
 
-            <!-- Sidebar Direita: Dados do Município -->
-            <aside class="info-panel">
-                <div id="city-info" class="hidden">
-                    <h2 id="city-name">Nome da Cidade</h2>
-                    <p class="uf-badge" id="city-uf">UF</p>
-                    
-                    <div class="data-section">
-                        <h3><i class="fas fa-users"></i> Demografia</h3>
-                        <div class="data-row"><span>Pop. Total:</span> <strong id="data-pop">0</strong></div>
-                        <div class="data-row"><span>Urbana/Rural:</span> <strong id="data-ur">0 / 0</strong></div>
-                    </div>
+            <!-- View: PARTY, EXECUTIVE, STF, ELECTIONS (Placeholders detalhados) -->
+            <div id="view-party" class="view-panel h-full p-8 overflow-auto"><h2 class="text-3xl font-bold"><i class="fa-solid fa-users text-gov-accent mr-3"></i>Gestão Partidária</h2><p class="mt-4 text-slate-400">Controle o fundo eleitoral, alianças e expulse dissidentes. (Módulo em expansão)</p></div>
+            <div id="view-executive" class="view-panel h-full p-8 overflow-auto"><h2 class="text-3xl font-bold"><i class="fa-solid fa-briefcase text-gov-accent mr-3"></i>Ministérios & Orçamento</h2><p class="mt-4 text-slate-400">Defina o orçamento para Saúde, Educação, Segurança e Infraestrutura.</p></div>
+            <div id="view-stf" class="view-panel h-full p-8 overflow-auto"><h2 class="text-3xl font-bold"><i class="fa-solid fa-scale-balanced text-gov-accent mr-3"></i>Supremo Tribunal Federal</h2><p class="mt-4 text-slate-400">11 Ministros. Julgamentos de corrupção e cassação de mandatos.</p></div>
+            <div id="view-elections" class="view-panel h-full p-8 overflow-auto"><h2 class="text-3xl font-bold"><i class="fa-solid fa-check-to-slot text-gov-accent mr-3"></i>Sistema Eleitoral</h2><p class="mt-4 text-slate-400">Acompanhe pesquisas (Datafolha simulado) e gerencie sua campanha de rádio/TV.</p></div>
 
-                    <div class="data-section">
-                        <h3><i class="fas fa-chart-pie"></i> Socioeconomia</h3>
-                        <div class="data-row"><span>Renda per capita:</span> <strong id="data-renda">R$ 0</strong></div>
-                        <div class="data-row"><span>Bolsa Família:</span> <strong id="data-bolsa">0</strong></div>
-                        <div class="data-row"><span>Analfabetismo:</span> <strong id="data-analfabetismo">0%</strong></div>
-                        <div class="data-row"><span>Saneamento:</span> <strong id="data-esgoto">0%</strong></div>
-                    </div>
+        </div>
+    </main>
 
-                    <div class="data-section">
-                        <h3><i class="fas fa-tractor"></i> Agronegócio</h3>
-                        <div class="data-row"><span>Soja (ton):</span> <strong id="data-soja">0</strong></div>
-                        <div class="data-row"><span>Bovinos:</span> <strong id="data-gado">0</strong></div>
-                    </div>
-
-                    <div class="party-influence">
-                        <h3>Sua Influência</h3>
-                        <div class="progress-bar">
-                            <div id="city-influence-bar" class="progress-fill" style="width: 0%;"></div>
-                        </div>
-                        <p id="city-influence-text">0% de intenção de votos</p>
-                        <button class="btn-action full-width" onclick="gameEngine.investInCity()"><i class="fas fa-money-bill-transfer"></i> Investir Fundo Eleitoral</button>
-                    </div>
+    <!-- Modals Globais -->
+    
+    <!-- Modal: Propor Lei -->
+    <div id="modal-law" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[999] hidden flex justify-center items-center">
+        <div class="bg-gov-800 w-full max-w-lg rounded-xl border border-gov-700 shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300">
+            <div class="p-5 border-b border-gov-700 bg-gov-900 flex justify-between items-center">
+                <h3 class="font-bold text-lg"><i class="fa-solid fa-file-signature text-gov-accent mr-2"></i>Redigir Nova Lei</h3>
+                <button onclick="parliamentSystem.closeLawModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">TIPO DE PROJETO</label>
+                    <select id="law-type" class="w-full bg-gov-900 border border-gov-700 rounded p-2 text-sm text-white outline-none focus:border-gov-accent">
+                        <option value="pl">Projeto de Lei Ordinária (PL) - Maioria Simples</option>
+                        <option value="plc">Projeto de Lei Complementar (PLC) - Maioria Absoluta</option>
+                        <option value="pec">Proposta de Emenda Const. (PEC) - 3/5</option>
+                        <option value="mp">Medida Provisória (MP) - Imediata</option>
+                    </select>
                 </div>
-                <div id="no-city-selected" class="empty-state">
-                    <i class="fas fa-location-crosshairs fa-3x"></i>
-                    <p>Selecione um município no mapa para ver dados detalhados e planejar ações.</p>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">TÍTULO DA PAUTA</label>
+                    <input type="text" id="law-title" placeholder="Ex: Reforma Tributária" class="w-full bg-gov-900 border border-gov-700 rounded p-2 text-sm text-white outline-none focus:border-gov-accent">
                 </div>
-            </aside>
-
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 mb-1">ALINHAMENTO IDEOLÓGICO DA PAUTA</label>
+                    <select id="law-alignment" class="w-full bg-gov-900 border border-gov-700 rounded p-2 text-sm text-white outline-none focus:border-gov-accent">
+                        <option value="esquerda">Foco Social / Estado Forte (Esquerda)</option>
+                        <option value="centro">Pragmático / Manutenção (Centro)</option>
+                        <option value="direita">Livre Mercado / Conservador (Direita)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="p-5 border-t border-gov-700 bg-gov-900 flex justify-end gap-3">
+                <button onclick="parliamentSystem.closeLawModal()" class="px-4 py-2 rounded text-sm font-medium hover:bg-gov-700 transition-colors">Cancelar</button>
+                <button onclick="parliamentSystem.submitLaw()" class="px-4 py-2 bg-gov-accent text-gov-900 rounded text-sm font-bold hover:bg-emerald-400 transition-colors shadow-lg shadow-gov-accent/20">Enviar ao Plenário</button>
+            </div>
         </div>
     </div>
 
-<!-- Adicione isso antes do data.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="data.js"></script>
+    <!-- Modal: Evento / Crise -->
+    <div id="modal-event" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[1000] hidden flex justify-center items-center">
+        <div class="bg-gov-800 w-full max-w-md rounded-xl border-t-4 border-red-500 shadow-2xl overflow-hidden text-center">
+            <div class="p-8">
+                <div class="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h2 id="event-title" class="text-2xl font-bold mb-2">Crise Global</h2>
+                <p id="event-desc" class="text-slate-300 text-sm mb-6">A bolsa despencou. O mercado exige medidas imediatas.</p>
+                <div class="flex justify-center gap-4" id="event-actions">
+                    <button onclick="gameEngine.closeEvent()" class="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded font-medium transition-colors">Entendido</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Logic Script -->
     <script src="app.js"></script>
 </body>
 </html>
