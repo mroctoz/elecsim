@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>República: Simulador Político Brasileiro</title>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Leaflet CSS (Mapa) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- TELA 1: CRIAÇÃO DO PARTIDO -->
+    <div id="creation-screen" class="screen active">
+        <div class="creation-modal">
+            <h1><i class="fas fa-landmark"></i> Fundação do Partido</h1>
+            <p>Defina as bases da sua legenda para iniciar a campanha.</p>
+            
+            <div class="form-group">
+                <label>Nome do Partido</label>
+                <input type="text" id="party-name" placeholder="Ex: Partido do Progresso Nacional">
+            </div>
+            
+            <div class="form-group">
+                <label>Sigla</label>
+                <input type="text" id="party-sigla" placeholder="Ex: PPN">
+            </div>
+            
+            <div class="form-group">
+                <label>Espectro Político</label>
+                <select id="party-ideology">
+                    <option value="esquerda">Esquerda</option>
+                    <option value="centro-esquerda">Centro-Esquerda</option>
+                    <option value="centro">Centro</option>
+                    <option value="centro-direita">Centro-Direita</option>
+                    <option value="direita">Direita</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Cor Oficial</label>
+                <input type="color" id="party-color" value="#1e3a8a">
+            </div>
+
+            <button id="btn-start-game" class="btn-primary"><i class="fas fa-flag"></i> Iniciar Jornada</button>
+        </div>
+    </div>
+
+    <!-- TELA 2: DASHBOARD PRINCIPAL -->
+    <div id="game-screen" class="screen">
+        
+        <!-- Topbar -->
+        <header class="topbar">
+            <div class="party-info">
+                <div id="ui-party-color" class="color-indicator"></div>
+                <h2 id="ui-party-name">Sigla</h2>
+            </div>
+            
+            <div class="game-stats">
+                <div class="stat-box" title="Fundos Partidários">
+                    <i class="fas fa-money-bill-wave" style="color: #4ade80;"></i>
+                    <span id="ui-money">R$ 0,00</span>
+                </div>
+                <div class="stat-box" title="Filiados">
+                    <i class="fas fa-users" style="color: #60a5fa;"></i>
+                    <span id="ui-members">0</span>
+                </div>
+                <div class="stat-box" title="Aprovação Nacional">
+                    <i class="fas fa-chart-line" style="color: #f43f5e;"></i>
+                    <span id="ui-approval">0%</span>
+                </div>
+            </div>
+
+            <div class="time-controls">
+                <span id="ui-date">01 Jan 2023</span>
+                <button id="btn-next-turn" class="btn-action"><i class="fas fa-forward"></i> Avançar Semana</button>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <div class="main-layout">
+            
+            <!-- Sidebar Esquerda: Ações -->
+            <aside class="sidebar">
+                <nav class="action-menu">
+                    <button class="menu-btn active" data-target="map-view"><i class="fas fa-map-marked-alt"></i> Mapa Eleitoral</button>
+                    <button class="menu-btn" data-target="campaign-view"><i class="fas class fa-bullhorn"></i> Campanhas</button>
+                    <button class="menu-btn" data-target="finance-view"><i class="fas fa-coins"></i> Finanças</button>
+                    <button class="menu-btn" data-target="law-view"><i class="fas fa-gavel"></i> Projetos de Lei</button>
+                </nav>
+
+                <div class="action-panel">
+                    <h3>Ações Rápidas</h3>
+                    <button class="btn-secondary" onclick="gameEngine.triggerRally()"><i class="fas fa-users-viewfinder"></i> Organizar Comício</button>
+                    <button class="btn-secondary" onclick="gameEngine.fundraise()"><i class="fas fa-hand-holding-dollar"></i> Arrecadação</button>
+                    <button class="btn-secondary" onclick="gameEngine.recruit()"><i class="fas fa-user-plus"></i> Campanha de Filiação</button>
+                </div>
+            </aside>
+
+            <!-- Centro: Mapa e Visualizações -->
+            <main class="content-area">
+                <div id="map"></div>
+                
+                <!-- Sistema de Eventos (Modal oculto) -->
+                <div id="event-modal" class="modal hidden">
+                    <div class="modal-content">
+                        <h2 id="event-title"><i class="fas fa-newspaper"></i> Notícia Urgente</h2>
+                        <p id="event-desc">Descrição do evento aqui.</p>
+                        <div id="event-options" class="event-options">
+                            <!-- Botões gerados via JS -->
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Sidebar Direita: Dados do Município -->
+            <aside class="info-panel">
+                <div id="city-info" class="hidden">
+                    <h2 id="city-name">Nome da Cidade</h2>
+                    <p class="uf-badge" id="city-uf">UF</p>
+                    
+                    <div class="data-section">
+                        <h3><i class="fas fa-users"></i> Demografia</h3>
+                        <div class="data-row"><span>Pop. Total:</span> <strong id="data-pop">0</strong></div>
+                        <div class="data-row"><span>Urbana/Rural:</span> <strong id="data-ur">0 / 0</strong></div>
+                    </div>
+
+                    <div class="data-section">
+                        <h3><i class="fas fa-chart-pie"></i> Socioeconomia</h3>
+                        <div class="data-row"><span>Renda per capita:</span> <strong id="data-renda">R$ 0</strong></div>
+                        <div class="data-row"><span>Bolsa Família:</span> <strong id="data-bolsa">0</strong></div>
+                        <div class="data-row"><span>Analfabetismo:</span> <strong id="data-analfabetismo">0%</strong></div>
+                        <div class="data-row"><span>Saneamento:</span> <strong id="data-esgoto">0%</strong></div>
+                    </div>
+
+                    <div class="data-section">
+                        <h3><i class="fas fa-tractor"></i> Agronegócio</h3>
+                        <div class="data-row"><span>Soja (ton):</span> <strong id="data-soja">0</strong></div>
+                        <div class="data-row"><span>Bovinos:</span> <strong id="data-gado">0</strong></div>
+                    </div>
+
+                    <div class="party-influence">
+                        <h3>Sua Influência</h3>
+                        <div class="progress-bar">
+                            <div id="city-influence-bar" class="progress-fill" style="width: 0%;"></div>
+                        </div>
+                        <p id="city-influence-text">0% de intenção de votos</p>
+                        <button class="btn-action full-width" onclick="gameEngine.investInCity()"><i class="fas fa-money-bill-transfer"></i> Investir Fundo Eleitoral</button>
+                    </div>
+                </div>
+                <div id="no-city-selected" class="empty-state">
+                    <i class="fas fa-location-crosshairs fa-3x"></i>
+                    <p>Selecione um município no mapa para ver dados detalhados e planejar ações.</p>
+                </div>
+            </aside>
+
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
