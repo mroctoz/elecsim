@@ -1,46 +1,111 @@
-// data.js - Gerenciamento de Dados Geográficos e Socioeconômicos
+// data.js - Gerenciamento de Dados Geográficos e Socioeconômicos via CSV/GeoJSON
 
 const GameData = {
-    municipalitiesData: {}, // Guardará os dados do CSV parseados pelo código do IBGE
-    geoJSON: null,
+    municipalitiesData: {}, // Dicionário que servirá como nosso "Banco de Dados" em memória
+    geoJSON: null,          // Armazenará os polígonos do mapa
 
-    // Amostra do GeoJSON fornecido pelo usuário (Apenas AC/RO para teste de renderização imediata)
-    // No projeto real hospedado, você faria um fetch('brasil_municipios.json')
-    sampleGeoJSON: {
-        "type": "FeatureCollection",
-        "features":[
-            {
-                "type": "Feature",
-                "geometry": { "type": "Polygon", "coordinates": [[[-62.417,-13.118],[-62.410,-13.107],[-62.387,-13.106],[-62.356,-13.083],[-62.417,-13.118]]] },
-                "properties": { "CD_MUN": "1100015", "NM_MUN": "Alta Floresta D'Oeste", "SIGLA_UF": "RO" }
-            },
-            {
-                "type": "Feature",
-                "geometry": { "type": "Polygon", "coordinates": [[[-63.596,-10.000],[-63.355,-10.000],[-63.113,-10.000],[-63.596,-10.000]]] },
-                "properties": { "CD_MUN": "1100023", "NM_MUN": "Ariquemes", "SIGLA_UF": "RO" }
-            }
-        ]
-    },
-
-    // Amostra do CSV transformada em Objeto JS para carregamento síncrono rápido.
-    // Num deploy real, usaremos PapaParse (biblioteca) para ler o arquivo .csv e preencher isso.
-    sampleCSVData: {
-        "1200013": { uf: "AC", nome: "Acrelândia", popRural: 6256, popUrbana: 7765, popTotal: 14021, despesa: 9059573, arroz: 256, banana: 2640, cafe: 57, cana: 390, feijao: 133, laranja: 60, soja: 0, bovinos: 71801, vacas: 359, bolsaFamilia: 2356, renda: 303.76, analfabetismo: 11.65, ifdm: 0.4849, esgoto: 25.26 },
-        "1200054": { uf: "AC", nome: "Assis Brasil", popRural: 3282, popUrbana: 4818, popTotal: 8100, despesa: 3971485, arroz: 490, banana: 1760, cafe: 189, cana: 300, feijao: 303, laranja: 139, soja: 0, bovinos: 352222, vacas: 3240, bolsaFamilia: 1730, renda: 291.33, analfabetismo: 14.7, ifdm: 0.2771, esgoto: 18.06 },
-        "1100015": { uf: "RO", nome: "Alta Floresta D'Oeste", popRural: 10000, popUrbana: 15000, popTotal: 25000, despesa: 15000000, arroz: 1000, banana: 500, cafe: 1200, cana: 0, feijao: 400, laranja: 100, soja: 5000, bovinos: 500000, vacas: 10000, bolsaFamilia: 3000, renda: 600.00, analfabetismo: 8.5, ifdm: 0.6000, esgoto: 40.0 },
-        "1100023": { uf: "RO", nome: "Ariquemes", popRural: 15000, popUrbana: 90000, popTotal: 105000, despesa: 85000000, arroz: 500, banana: 1000, cafe: 800, cana: 0, feijao: 200, laranja: 300, soja: 15000, bovinos: 800000, vacas: 25000, bolsaFamilia: 8000, renda: 850.00, analfabetismo: 6.2, ifdm: 0.7100, esgoto: 55.0 }
-    },
-
+    /**
+     * Função inicializadora chamada pelo app.js ao iniciar o jogo.
+     * Ela fará o download do Mapa e do CSV de forma assíncrona.
+     */
     async init() {
-        // Num cenário de produção real no Vercel:
-        // this.geoJSON = await fetch('data/municipios.geojson').then(r => r.json());
-        // Aqui usaremos a amostra para garantir que funcione imediatamente sem backend:
-        this.geoJSON = this.sampleGeoJSON;
-        this.municipalitiesData = this.sampleCSVData;
-        console.log("Dados carregados com sucesso.");
+        try {
+            console.log("Iniciando o carregamento dos bancos de dados...");
+
+            // 1. Baixar o arquivo de Mapa (GeoJSON)
+            const geoResponse = await fetch('municipios.geojson');
+            if (!geoResponse.ok) {
+                throw new Error("Arquivo municipios.geojson não encontrado. Verifique se ele está na pasta do projeto.");
+            }
+            this.geoJSON = await geoResponse.json();
+            console.log("Mapa (GeoJSON) carregado com sucesso!");
+
+            // 2. Baixar o arquivo de Dados (CSV)
+            const csvResponse = await fetch('dados.csv');
+            if (!csvResponse.ok) {
+                throw new Error("Arquivo dados.csv não encontrado. Verifique se ele está na pasta do projeto.");
+            }
+            const csvText = await csvResponse.text();
+
+            // 3. Fazer o Parse (Leitura) do CSV usando a biblioteca PapaParse
+            return new Promise((resolve, reject) => {
+                Papa.parse(csvText, {
+                    header: true,          // Usa a primeira linha como chave das colunas
+                    skipEmptyLines: true,  // Ignora linhas em branco no fim do arquivo
+                    dynamicTyping: true,   // Converte números automaticamente (de texto para int/float)
+                    complete: (results) => {
+                        this.processCSV(results.data);
+                        console.log("Dados socioeconômicos (CSV) processados com sucesso!");
+                        resolve();
+                    },
+                    error: (error) => {
+                        console.error("Falha ao processar o arquivo CSV:", error);
+                        reject(error);
+                    }
+                });
+            });
+
+        } catch (error) {
+            console.error("Erro crítico de inicialização:", error);
+            alert("Atenção: Não foi possível carregar os dados do jogo. Certifique-se de que os arquivos 'dados.csv' e 'municipios.geojson' estão na raiz do projeto e que você está rodando o jogo em um servidor local (Live Server/Vercel).");
+        }
     },
 
+    /**
+     * Pega o Array puro gerado pelo PapaParse e transforma em um Dicionário de busca O(1)
+     * onde a chave é o Código do Município (CD_MUN) para cruzarmos perfeitamente com o mapa.
+     */
+    processCSV(rawData) {
+        rawData.forEach(row => {
+            // Tenta pegar o código do município. O .toString() garante que será uma string padronizada.
+            const cdMunRaw = row['CD_MUN'] || row['CD_MUN ']; // Trata possíveis espaços invisíveis no cabeçalho
+            
+            if (!cdMunRaw) return; // Pula a linha se não houver código do município
+
+            const cdMun = cdMunRaw.toString().trim();
+
+            // Mapeamento exato das colunas fornecidas no seu prompt
+            // Usamos || 0 (ou null) como fallback (defesa) caso o dado esteja em branco naquela célula do Excel.
+            this.municipalitiesData[cdMun] = {
+                uf: row['Sigla'] || "?",
+                nome: row['NM_MUN'] || "Desconhecido",
+                
+                // Demografia
+                popTotal: row['pop. Total'] || 0,
+                popUrbana: row['pop. Urbana'] || 0,
+                popRural: row['pop. Rural'] || 0,
+                
+                // Socioeconomia
+                renda: row['Renda per capita média (2010)'] || 0,
+                bolsaFamilia: row['Beneficiários do Bolsa Família'] || 0,
+                analfabetismo: row['Taxa de analfabetismo'] || 0,
+                ifdm: row['IFDM'] || 0,
+                esgoto: row['Domicílios com rede de esgoto e/ou fossa séptica'] || 0,
+                
+                // Finanças Públicas
+                despesa: row['despesa de custeio'] || 0,
+                
+                // Agronegócio
+                soja: row['Produção - soja (2022)'] || 0,
+                arroz: row['Produção - arroz (2022)'] || 0,
+                banana: row['Produção - banana (2022)'] || 0,
+                cafe: row['Produção - café (2022)'] || 0,
+                cana: row['Produção - cana-de-açúcar (2022)'] || 0,
+                feijao: row['Produção - feijão (2022)'] || 0,
+                laranja: row['Produção - laranja (2022)'] || 0,
+                
+                // Pecuária
+                bovinos: row['Efetivo - bovinos - quantidade (2022)'] || 0,
+                vacas: row['Efetivo - vacas ordenhadas - quantidade (2022)'] || 0
+            };
+        });
+    },
+
+    /**
+     * Função chamada pelo app.js para buscar os dados de uma cidade quando o jogador clica nela
+     */
     getCityData(cd_mun) {
-        return this.municipalitiesData[cd_mun] || null;
+        if (!cd_mun) return null;
+        return this.municipalitiesData[cd_mun.toString()] || null;
     }
 };
