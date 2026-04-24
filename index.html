@@ -1,261 +1,702 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="dark">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E-Sim Brasil | Simulador Político</title>
+    <title>LawGivers II - Brasil (Front-end Client)</title>
     
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Fontes e Ícones -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Bibliotecas Externas -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        /* ================= VARIÁVEIS E RESET ================= */
+        * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; font-family: 'Inter', sans-serif; }
+        
+        :root {
+            --bg-ocean: #0d1117; 
+            --panel-bg: rgba(22, 27, 34, 0.95);
+            --border: #30363d;
+            --text-main: #c9d1d9;
+            --text-muted: #8b949e;
+            
+            /* Cores de Jogo */
+            --pt: #E52229; --pl: #224292; --mdb: #00A550; --uniao: #004C97; 
+            --psd: #0054A6; --psol: #FACA0F; --novo: #FF6700;
+            --green: #2ea043; --red: #f85149; --blue: #58a6ff; --gold: #d29922;
+        }
+
+        body { background-color: var(--bg-ocean); color: var(--text-main); overflow: hidden; width: 100vw; height: 100vh; }
+
+        /* ================= MAPA E CONTROLES ================= */
+        #map { position: absolute; top: 50px; bottom: 60px; left: 0; right: 0; z-index: 1; background: #090c10; }
+        
+        .map-filters { position: absolute; top: 70px; right: 20px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
+        .filter-btn { background: var(--panel-bg); border: 1px solid var(--border); color: var(--text-muted); padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: 0.2s; display: flex; align-items: center; gap: 8px; }
+        .filter-btn.active { color: #fff; border-color: var(--blue); background: rgba(88, 166, 255, 0.1); }
+        .filter-btn:hover { border-color: var(--text-main); }
+
+        .leaflet-tooltip-own { background: rgba(13, 17, 23, 0.95)!important; border: 1px solid var(--border)!important; color: #fff!important; border-radius: 8px!important; box-shadow: 0 4px 15px rgba(0,0,0,0.8); padding: 0!important; }
+        .tt-head { background: #161b22; padding: 10px 15px; font-weight: 900; font-size: 15px; border-bottom: 1px solid var(--border); border-radius: 8px 8px 0 0; }
+        .tt-body { padding: 12px 15px; }
+        .tt-stat { display: flex; justify-content: space-between; gap: 15px; font-size: 13px; margin-bottom: 4px; }
+
+        .legend-box { position: absolute; bottom: 80px; right: 20px; z-index: 50; background: var(--panel-bg); border: 1px solid var(--border); padding: 15px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.8); width: 220px; }
+        .legend-title { font-size: 11px; font-weight: 900; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; }
+        .legend-grid { display: flex; height: 12px; border-radius: 4px; overflow: hidden; border: 1px solid #000; }
+
+        #btn-back-map { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); z-index: 100; background: var(--blue); color: #000; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-weight: 900; display: none; box-shadow: 0 4px 15px rgba(0,0,0,0.8); }
+
+        /* ================= BARRAS TOP/BOTTOM ================= */
+        .bar { position: absolute; left: 0; width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; box-shadow: 0 2px 15px rgba(0,0,0,0.9); z-index: 100; }
+        #top-bar { top: 0; height: 50px; background: linear-gradient(to bottom, #21262d, #161b22); border-bottom: 1px solid var(--border); }
+        #bottom-bar { bottom: 0; height: 60px; background: linear-gradient(to top, #161b22, #21262d); border-top: 1px solid var(--border); }
+        
+        .group { display: flex; align-items: center; gap: 20px; height: 100%; }
+        .stat-item { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 15px; color: #fff; }
+        .player-stat { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 16px; background: rgba(0,0,0,0.4); padding: 8px 15px; border-radius: 8px; border: 1px solid var(--border); }
+        
+        .action-btn { background: #21262d; border: 1px solid var(--border); border-radius: 8px; padding: 0 15px; height: 40px; display: flex; align-items: center; gap: 8px; cursor: pointer; color: #fff; font-weight: bold; transition: 0.2s; }
+        .action-btn:hover { background: #30363d; border-color: var(--text-muted); }
+        
+        .turn-btn { background: var(--blue); border: none; border-radius: 8px; width: 60px; height: 42px; display: flex; justify-content: center; align-items: center; cursor: pointer; color: #000; font-size: 20px; box-shadow: 0 0 15px rgba(88, 166, 255, 0.4); transition: 0.2s; }
+        .turn-btn:hover { transform: scale(1.05); background: #79c0ff; }
+
+        /* ================= PAINÉIS LATERAIS ================= */
+        .side-panel { position: absolute; top: 65px; width: 380px; height: calc(100vh - 140px); background: var(--panel-bg); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.9); z-index: 50; backdrop-filter: blur(10px); }
+        #left-panel { left: 15px; }
+        #right-panel { right: 15px; display: none; }
+        
+        .panel-header { background: rgba(0,0,0,0.4); height: 60px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; font-weight: 900; font-size: 18px; border-bottom: 1px solid var(--border); color: #fff; }
+        .panel-content { flex: 1; overflow-y: auto; padding: 15px; }
+        .panel-content::-webkit-scrollbar { width: 6px; }
+        .panel-content::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+
+        /* Gráficos e Abas */
+        .chart-container { width: 100%; height: 180px; display: flex; justify-content: center; align-items: center; padding: 10px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+        .tabs-header { display: flex; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.3); }
+        .tab-btn { flex: 1; text-align: center; padding: 12px; font-weight: bold; cursor: pointer; color: var(--text-muted); transition: 0.2s; border-bottom: 2px solid transparent; }
+        .tab-btn.active { color: var(--blue); border-bottom: 2px solid var(--blue); background: rgba(0,0,0,0.2); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Listas e Grids */
+        .cand-row { display: flex; align-items: center; gap: 12px; padding: 12px; background: #161b22; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; }
+        .cand-color { width: 14px; height: 40px; border-radius: 4px; }
+        .cand-info { flex: 1; display: flex; flex-direction: column; }
+        .cand-head { display: flex; justify-content: space-between; font-weight: 900; font-size: 15px; color: #fff; }
+        .progress-bar { width: 100%; height: 6px; background: #090c10; border-radius: 3px; margin-top: 6px; overflow: hidden; border: 1px solid #30363d; }
+        .progress-fill { height: 100%; border-radius: 3px; transition: width 1s ease; }
+
+        .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .data-card { background: #161b22; border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center; }
+        .data-card-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 5px; font-weight: bold; }
+        .data-card-val { font-size: 18px; font-weight: 900; color: #fff; }
+
+        /* ================= MODAIS ================= */
+        .modal-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.85); z-index: 200; display: none; justify-content: center; align-items: center; backdrop-filter: blur(8px); }
+        .action-modal { background: var(--panel-bg); width: 600px; max-height: 85vh; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; box-shadow: 0 15px 40px rgba(0,0,0,0.9); }
+        .modal-header { padding: 20px; display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 20px; border-bottom: 1px solid var(--border); color: #fff; }
+        .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+        .close-btn { background: none; border: none; color: var(--text-muted); font-size: 24px; cursor: pointer; transition: 0.2s; }
+        .close-btn:hover { color: #fff; }
+
+        /* Plenário Animado */
+        .plenario-screen { background: #000; border: 2px solid var(--border); border-radius: 12px; padding: 30px; text-align: center; box-shadow: inset 0 0 50px rgba(255,255,255,0.02); }
+        .vote-grid { display: flex; justify-content: space-between; margin-top: 30px; }
+        .vote-box { flex: 1; margin: 0 10px; padding: 15px; border-radius: 8px; border: 2px solid #222; }
+        .vote-box.sim { border-color: var(--green); background: rgba(46, 160, 67, 0.1); }
+        .vote-box.nao { border-color: var(--red); background: rgba(248, 81, 73, 0.1); }
+        .vote-box.abs { border-color: #8b949e; background: rgba(139, 148, 158, 0.1); }
+        .vote-num { font-size: 48px; font-weight: 900; font-family: monospace; }
+        
+        .progress-container { width: 100%; height: 20px; background: #222; border-radius: 10px; margin-top: 30px; overflow: hidden; border: 1px solid #444; }
+        .progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--blue), #79c0ff); width: 0%; transition: width 0.1s linear; }
+
+        /* Loader de Conexão */
+        #loader { position: absolute; inset: 0; background: var(--bg-ocean); z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 18px; font-weight: bold; color: #fff; transition: opacity 0.3s; }
+        .hidden { opacity: 0; pointer-events: none; }
+
+        .toast-area { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .toast { background: rgba(13, 17, 23, 0.95); border: 1px solid var(--border); color: #fff; padding: 15px 25px; border-radius: 8px; font-weight: bold; font-size: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.8); animation: fadeInDown 0.3s forwards, fadeOutUp 0.5s 4s forwards; display: flex; align-items: center; gap: 10px; }
+        @keyframes fadeInDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes fadeOutUp { to { opacity: 0; transform: translateY(-20px); } }
+
+    </style>
+</head>
+<body>
+
+    <!-- TELA DE LOADING E TOASTS -->
+    <div id="loader">
+        <i class="fas fa-satellite-dish fa-spin fa-3x" style="color: var(--blue); margin-bottom: 20px;"></i>
+        <p id="loader-text">Conectando ao Servidor Back-end...</p>
+        <p style="font-size: 12px; color: var(--text-muted); margin-top: 10px;">Iniciando Motor Geográfico</p>
+    </div>
+    <div class="toast-area" id="toast-area"></div>
+
+    <!-- MAPA E FILTROS -->
+    <div id="map"></div>
+    <button id="btn-back-map" onclick="UI.resetMapToNational()"><i class="fas fa-arrow-left"></i> Visão Nacional</button>
+
+    <div class="map-filters">
+        <button class="filter-btn active" id="btn-filter-pol" onclick="UI.setMapMode('POLITICAL')"><i class="fas fa-vote-yea"></i> Visão Política</button>
+        <button class="filter-btn" id="btn-filter-eco" onclick="UI.setMapMode('SOCIOECONOMIC')"><i class="fas fa-coins"></i> Visão Socioeconômica</button>
+    </div>
+
+    <div class="legend-box" id="legend-box">
+        <div class="legend-title" id="legend-title">Intensidade do Vencedor</div>
+        <div class="legend-grid" id="legend-grid"></div>
+        <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-top:6px;">
+            <span id="leg-min">&le;30%</span><span id="leg-max">100%</span>
+        </div>
+    </div>
+
+    <!-- TOP BAR -->
+    <div id="top-bar" class="bar">
+        <div class="group">
+            <div class="action-btn" onclick="UI.togglePanel('left-panel')"><i class="fas fa-landmark"></i> Congresso</div>
+            <div class="stat-item" title="Aprovação Popular"><i class="fas fa-face-smile" style="color: var(--gold);"></i> <span id="val-happiness">--</span></div>
+            <div class="stat-item" title="Tesouro (Bilhões)"><i class="fas fa-coins" style="color: var(--gold);"></i> R$ <span id="val-treasury">--</span> B</div>
+            <div class="stat-item" title="Crescimento PIB"><i class="fas fa-chart-line" id="icon-growth"></i> <span id="val-growth">--</span></div>
+            <div class="stat-item" title="Segurança"><i class="fas fa-shield-alt" style="color: var(--blue);"></i> <span id="val-security">--</span></div>
+        </div>
+        <div class="group">
+            <div class="action-btn" onclick="API.forceElections()"><i class="fas fa-sync-alt"></i> Forçar Eleições (Teste)</div>
+            <div class="action-btn"><i class="fas fa-cog"></i></div>
+        </div>
+    </div>
+
+    <!-- BOTTOM BAR -->
+    <div id="bottom-bar" class="bar">
+        <div class="group">
+            <div class="player-stat" title="Poder Político"><i class="fas fa-hand-fist" style="color: #f1c27d;"></i> <span id="val-pp">--</span> PP</div>
+            <div class="player-stat" title="Fundo Partidário"><i class="fas fa-money-bill-wave" style="color: var(--green);"></i> R$ <span id="val-party-funds">--</span> M</div>
+            <div class="player-stat" title="Aprovação do Governo"><i class="fas fa-thumbs-up" style="color: var(--blue);"></i> <span id="val-approval">--</span></div>
+        </div>
+        <div class="group">
+            <div class="action-btn" onclick="UI.openModal('laws')"><i class="fas fa-gavel"></i> Projetos de Lei</div>
+            <div class="action-btn" onclick="UI.openModal('corruption')" style="color: var(--red); border-color: #552222;"><i class="fas fa-user-secret"></i> Sigiloso</div>
+            <div class="action-btn" style="background: #0d1117; font-size: 18px; color: var(--gold); border-color: var(--border);">
+                <i class="fas fa-calendar-alt"></i> <span id="val-date">--/----</span>
+            </div>
+            <button class="turn-btn" onclick="API.nextTurn()" title="Passar Mês"><i class="fas fa-forward"></i></button>
+        </div>
+    </div>
+
+    <!-- PAINEL ESQUERDO (Congresso) -->
+    <div id="left-panel" class="side-panel">
+        <div class="panel-header"><span><i class="fas fa-landmark"></i> Câmara dos Deputados</span></div>
+        <div class="chart-container"><canvas id="parliamentChart"></canvas></div>
+        <div style="padding: 10px; background: rgba(0,0,0,0.5); text-align: center; font-size: 13px; border-bottom: 1px solid var(--border);">
+            Governabilidade: <span id="val-gov" style="color: var(--green); font-weight: 900;">Conectando...</span>
+        </div>
+        <div class="panel-content" id="parliament-list"></div>
+    </div>
+
+    <!-- PAINEL DIREITO (Estado/Município) -->
+    <div id="right-panel" class="side-panel">
+        <div class="panel-header">
+            <span id="rp-title">Localidade</span>
+            <span style="font-size: 11px; color: var(--blue); background: rgba(88, 166, 255, 0.1); padding: 4px 8px; border-radius: 12px; border: 1px solid var(--blue);" id="rp-subtitle">Tipo</span>
+        </div>
+        <div class="tabs-header">
+            <div class="tab-btn active" onclick="UI.switchTab('eleicoes')"><i class="fas fa-vote-yea"></i> Eleições</div>
+            <div class="tab-btn" onclick="UI.switchTab('economia')"><i class="fas fa-chart-pie"></i> Indicadores CSV</div>
+        </div>
+
+        <div class="panel-content tab-content active" id="tab-eleicoes">
+            <div id="local-results-list"></div>
+        </div>
+
+        <div class="panel-content tab-content" id="tab-economia">
+            <div id="socio-data-container"></div>
+        </div>
+    </div>
+
+    <!-- MODAL PRINCIPAL -->
+    <div id="action-modal" class="modal-overlay">
+        <div class="action-modal" id="modal-container">
+            <div class="modal-header">
+                <span id="am-title">Título</span>
+                <button class="close-btn" onclick="UI.closeModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="am-body"></div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT DO CLIENTE -->
     <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        gov: {
-                            900: '#0f172a', // Deep dark blue
-                            800: '#1e293b',
-                            700: '#334155',
-                            accent: '#10b981' // Green BR
-                        }
+        /**
+         * ===================================================================
+         * CONFIGURAÇÕES DO CLIENTE FRONT-END
+         * ===================================================================
+         */
+        const Config = {
+            API_URL: 'http://localhost:3000/api', // URL do Back-end Node.js
+            colors: {
+                'PT': 'var(--pt)', 'PL': 'var(--pl)', 'MDB': 'var(--mdb)', 'UNIAO': 'var(--uniao)',
+                'PSD': 'var(--psd)', 'PSOL': 'var(--psol)', 'NOVO': 'var(--novo)', 'DEFAULT': '#555'
+            },
+            ufMap: {'AC':'12','AL':'27','AM':'13','AP':'16','BA':'29','CE':'23','DF':'53','ES':'32','GO':'52','MA':'21','MG':'31','MS':'50','MT':'51','PA':'15','PB':'25','PE':'26','PI':'22','PR':'41','RJ':'33','RN':'24','RO':'11','RR':'14','RS':'43','SC':'42','SE':'28','SP':'35','TO':'17'}
+        };
+
+        // Estado local cacheado para renderização rápida
+        let ClientState = {
+            mapMode: 'POLITICAL', // POLITICAL | SOCIOECONOMIC
+            activeScope: 'ESTADOS',
+            activeUF: null,
+            globalStats: null,
+            elections: { national:[], states: {}, municipalities: {} },
+            socioCache: {}
+        };
+
+        /**
+         * ===================================================================
+         * CLIENTE API (Conecta ao Back-end)
+         * ===================================================================
+         */
+        const API = {
+            // Função genérica de fetch com tratamento de erro (Fallback para não quebrar a UI se o server não estiver rodando)
+            async request(endpoint, method = 'GET', body = null) {
+                try {
+                    let options = { method, headers: { 'Content-Type': 'application/json' } };
+                    if(body) options.body = JSON.stringify(body);
+                    const res = await fetch(Config.API_URL + endpoint, options);
+                    if(!res.ok) throw new Error("Server Error");
+                    return await res.json();
+                } catch (e) {
+                    console.warn(`Back-end não encontrado em ${Config.API_URL}${endpoint}. Usando Mock de segurança.`);
+                    return API.mockFallback(endpoint, body);
+                }
+            },
+
+            async getGameState() {
+                let data = await API.request('/state');
+                ClientState.globalStats = data;
+                UI.updateBars();
+            },
+
+            async getElections() {
+                let data = await API.request('/elections');
+                ClientState.elections = data;
+                UI.updateCongressChart();
+                MapEngine.refreshMap();
+            },
+
+            async getCityData(cityId) {
+                if(ClientState.socioCache[cityId]) return ClientState.socioCache[cityId];
+                let data = await API.request(`/municipality/${cityId}`);
+                ClientState.socioCache[cityId] = data;
+                return data;
+            },
+
+            async getLaws() { return await API.request('/laws'); },
+
+            async proposeLaw(lawId) {
+                let res = await API.request('/laws/propose', 'POST', { id: lawId });
+                UI.animatePlenario(res);
+            },
+
+            async nextTurn() {
+                await API.request('/turn', 'POST');
+                await API.getGameState();
+                UI.toast("Turno avançado com sucesso.", "success");
+            },
+
+            async forceElections() {
+                UI.animateApuracao();
+                await API.request('/elections/force', 'POST'); // Back-end processa
+                setTimeout(async () => {
+                    await API.getGameState();
+                    await API.getElections();
+                    UI.closeModal();
+                    UI.toast("Novos representantes eleitos!", "success");
+                }, 3000);
+            },
+
+            // --- MOCK DE SEGURANÇA (Para o HTML rodar sozinho temporariamente) ---
+            mockFallback: (endpoint, body) => {
+                if(endpoint === '/state') return { year: 2026, month: 10, treasury: 850.5, happiness: 65, growth: 2.1, security: 55, pp: 120, partyFunds: 45.0, approval: 52.0, govStatus: 'Alta' };
+                if(endpoint === '/elections') {
+                    let dummyElections = { national:[{id:'PT', seats:120, pct:23.3},{id:'PL', seats:110, pct:21.4},{id:'MDB', seats:60, pct:11.6},{id:'UNIAO', seats:50, pct:9.7}], states:{}, municipalities:{} };
+                    Object.values(Config.ufMap).forEach(uf => { dummyElections.states[uf] = { winner:{id:['PT','PL','UNIAO'][Math.floor(Math.random()*3)], pct: 40+Math.random()*20}, ranking:[] }; });
+                    return dummyElections;
+                }
+                if(endpoint.includes('/municipality/')) {
+                    // Simula leitura de CSV baseada no pedido do usuário
+                    let income = 200 + Math.random()*800; // Pobreza vs Riqueza simulada
+                    return { popTotal: 15000 + Math.floor(Math.random()*50000), renda: income.toFixed(2), ifdm: (0.3 + Math.random()*0.5).toFixed(4), analfabetismo: (5 + Math.random()*20).toFixed(1), esgoto: (10 + Math.random()*80).toFixed(1), bolsaF: 2000 + Math.floor(Math.random()*5000) };
+                }
+                if(endpoint === '/laws') return[ { id: 'l1', name: 'Bolsa Família Expandido', desc: 'Aumenta aprovação no nordeste e em cidades pobres. Custo altíssimo.', costPP: 30, costM: 10 }, { id: 'l2', name: 'Reforma Tributária', desc: 'Aumenta Tesouro, perde aprovação.', costPP: 40, costM: 5 } ];
+                if(endpoint === '/laws/propose') {
+                    let passed = Math.random() > 0.3;
+                    return { passed, sim: passed ? 300 : 200, nao: passed ? 150 : 250, abs: 63 };
+                }
+                return {};
+            }
+        };
+
+        /**
+         * ===================================================================
+         * MAP ENGINE (Leaflet + Cores Sociais/Políticas)
+         * ===================================================================
+         */
+        const MapEngine = {
+            map: null, layer: null,
+
+            init: async () => {
+                MapEngine.map = L.map('map', { center:[-15, -50], zoom: 4, zoomControl: false, preferCanvas: true });
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { opacity: 0.3 }).addTo(MapEngine.map);
+                await MapEngine.loadNational();
+            },
+
+            loadNational: async () => {
+                document.getElementById('loader-text').innerText = "Carregando Malha Geográfica...";
+                const res = await fetch('https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson');
+                const data = await res.json();
+                data.features.forEach(f => f.properties.id = Config.ufMap[f.properties.sigla]);
+
+                if(MapEngine.layer) MapEngine.map.removeLayer(MapEngine.layer);
+                MapEngine.layer = L.geoJSON(data, {
+                    smoothFactor: 0.5,
+                    style: f => MapEngine.getStyle(f.properties.id, 'ESTADOS'),
+                    onEachFeature: (f, l) => {
+                        l.bindTooltip(MapEngine.buildTooltip(f.properties.id, f.properties.name, 'ESTADOS'), {className: 'leaflet-tooltip-own'});
+                        l.on('click', () => MapEngine.drillDown(f.properties.id, f.properties.name));
+                    }
+                }).addTo(MapEngine.map);
+                document.getElementById('loader').classList.add('hidden');
+            },
+
+            drillDown: async (ufId, ufName) => {
+                UI.toast(`Carregando municípios de ${ufName}...`, "info");
+                ClientState.activeScope = 'MUNICÍPIOS';
+                ClientState.activeUF = ufId;
+                
+                // Pega malha do Github (rápido e não cai como a API do IBGE)
+                const res = await fetch(`https://raw.githubusercontent.com/tbrugz/geodata-br/master/geojson/geojs-${ufId}-mun.json`);
+                const data = await res.json();
+
+                if(MapEngine.layer) MapEngine.map.removeLayer(MapEngine.layer);
+                MapEngine.layer = L.geoJSON(data, {
+                    smoothFactor: 0.2, // Essencial para não ter buracos
+                    style: f => MapEngine.getStyle(f.properties.id || f.properties.codarea, 'MUNICÍPIOS'),
+                    onEachFeature: (f, l) => {
+                        let id = f.properties.id || f.properties.codarea;
+                        let name = f.properties.name || f.properties.nome;
+                        l.bindTooltip(MapEngine.buildTooltip(id, name, 'MUNICÍPIOS'), {className: 'leaflet-tooltip-own'});
+                        l.on('click', () => UI.showCityPanel(id, name));
+                    }
+                }).addTo(MapEngine.map);
+
+                MapEngine.map.fitBounds(MapEngine.layer.getBounds());
+                document.getElementById('btn-back-map').style.display = 'block';
+                UI.showCityPanel(ufId, ufName, true); // Mostra estado no painel por default
+            },
+
+            refreshMap: () => {
+                if(MapEngine.layer) MapEngine.layer.setStyle(f => MapEngine.getStyle(f.properties.id || f.properties.codarea, ClientState.activeScope));
+                UI.updateLegend();
+            },
+
+            // Motor de Cores
+            getStyle: (id, scope) => {
+                let color = '#21262d'; // Default dark
+                let opacity = 0.8;
+
+                if(ClientState.mapMode === 'POLITICAL') {
+                    let result = scope === 'ESTADOS' ? ClientState.elections.states[id] : (ClientState.elections.municipalities[id] || ClientState.elections.states[ClientState.activeUF]);
+                    if(result && result.winner) {
+                        let hex = Config.colors[result.winner.id] || '#888';
+                        // Escurece ou clareia baseado na % (30% a 100%)
+                        opacity = Math.max(0.3, Math.min(1.0, result.winner.pct / 70));
+                        color = hex;
+                    }
+                } 
+                else if (ClientState.mapMode === 'SOCIOECONOMIC') {
+                    // Lê do cache socioeconômico (simula um heat map de renda/IFDM)
+                    let data = ClientState.socioCache[id];
+                    if(data) {
+                        let renda = parseFloat(data.renda);
+                        // Renda < 300 = Vermelho (Pobre), Renda > 600 = Verde (Rico)
+                        if(renda < 300) color = 'var(--red)';
+                        else if(renda < 500) color = 'var(--gold)';
+                        else color = 'var(--green)';
+                        opacity = 0.7;
+                    } else {
+                        // Se não tem no cache, dispara request em background e deixa cinza por enquanto
+                        API.getCityData(id).then(() => { if(ClientState.mapMode === 'SOCIOECONOMIC') MapEngine.refreshMap(); });
+                        color = '#444';
                     }
                 }
+
+                return { fillColor: color, weight: scope==='ESTADOS'? 1.5 : 0.3, color: '#c9d1d9', fillOpacity: opacity };
+            },
+
+            buildTooltip: (id, name, scope) => {
+                return () => {
+                    let body = '';
+                    if(ClientState.mapMode === 'POLITICAL') {
+                        let res = scope === 'ESTADOS' ? ClientState.elections.states[id] : (ClientState.elections.municipalities[id] || ClientState.elections.states[ClientState.activeUF]);
+                        if(res) {
+                            let c = Config.colors[res.winner.id] || '#fff';
+                            body = `<div class="tt-stat"><span>Líder:</span><span style="color:${c}; font-weight:900;">${res.winner.id} (${res.winner.pct.toFixed(1)}%)</span></div>`;
+                        } else body = `<div class="tt-stat">Sem dados eleitorais</div>`;
+                    } else {
+                        let d = ClientState.socioCache[id];
+                        if(d) {
+                            body = `<div class="tt-stat"><span>Renda (PC):</span><span style="color:var(--green)">R$ ${d.renda}</span></div>
+                                    <div class="tt-stat"><span>IFDM:</span><span style="color:var(--blue)">${d.ifdm}</span></div>`;
+                        } else body = `<div class="tt-stat" style="color:var(--text-muted)">Carregando dados CSV...</div>`;
+                    }
+                    return `<div class="tt-head">${name}</div><div class="tt-body">${body}</div>`;
+                };
             }
-        }
+        };
+
+        /**
+         * ===================================================================
+         * INTERFACE E CONTROLES (UI)
+         * ===================================================================
+         */
+        const UI = {
+            toast: (msg, type='info') => {
+                const area = document.getElementById('toast-area');
+                const t = document.createElement('div');
+                t.className = 'toast';
+                let icon = type==='error'?'fa-exclamation-triangle':type==='success'?'fa-check-circle':'fa-info-circle';
+                let color = type==='error'?'var(--red)':type==='success'?'var(--green)':'var(--blue)';
+                t.innerHTML = `<i class="fas ${icon}" style="color:${color}; font-size:18px;"></i> <span>${msg}</span>`;
+                area.appendChild(t);
+                setTimeout(() => { if(t.parentElement) t.remove(); }, 4500);
+            },
+
+            updateBars: () => {
+                let st = ClientState.globalStats;
+                if(!st) return;
+                document.getElementById('val-happiness').innerText = Math.round(st.happiness) + '%';
+                document.getElementById('val-treasury').innerText = st.treasury.toFixed(1);
+                document.getElementById('val-growth').innerText = (st.growth > 0 ? '+' : '') + st.growth.toFixed(1) + '%';
+                document.getElementById('val-growth').style.color = st.growth < 0 ? 'var(--red)' : 'var(--green)';
+                document.getElementById('icon-growth').className = st.growth < 0 ? 'fas fa-chart-line fa-flip-vertical' : 'fas fa-chart-line';
+                document.getElementById('icon-growth').style.color = st.growth < 0 ? 'var(--red)' : 'var(--green)';
+                document.getElementById('val-security').innerText = Math.round(st.security) + '%';
+                
+                document.getElementById('val-pp').innerText = Math.floor(st.pp);
+                document.getElementById('val-party-funds').innerText = st.partyFunds.toFixed(1);
+                document.getElementById('val-approval').innerText = Math.round(st.approval) + '%';
+                document.getElementById('val-date').innerText = `${st.month.toString().padStart(2,'0')}/${st.year}`;
+                document.getElementById('val-gov').innerText = st.govStatus;
+            },
+
+            updateCongressChart: () => {
+                let data = ClientState.elections.national;
+                if(!data || data.length === 0) return;
+                
+                const ctx = document.getElementById('parliamentChart').getContext('2d');
+                if(UI.chart) UI.chart.destroy();
+                
+                UI.chart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: { 
+                        labels: data.map(d => d.id), 
+                        datasets:[{ data: data.map(d => d.seats), backgroundColor: data.map(d => Config.colors[d.id]||'#888'), borderWidth: 0 }] 
+                    },
+                    options: { rotation: -90, circumference: 180, cutout: '70%', maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                });
+
+                const list = document.getElementById('parliament-list');
+                list.innerHTML = data.map(p => {
+                    let c = Config.colors[p.id] || '#888';
+                    return `<div class="cand-row"><div class="cand-color" style="background:${c}"></div><div class="cand-info"><div class="cand-head"><span>${p.id}</span><span>${p.seats} <i class="fas fa-chair" style="color:var(--text-muted);font-size:12px"></i></span></div><div class="progress-bar"><div class="progress-fill" style="width:${p.pct}%; background:${c}"></div></div></div></div>`;
+                }).join('');
+            },
+
+            setMapMode: (mode) => {
+                ClientState.mapMode = mode;
+                document.getElementById('btn-filter-pol').classList.toggle('active', mode==='POLITICAL');
+                document.getElementById('btn-filter-eco').classList.toggle('active', mode==='SOCIOECONOMIC');
+                MapEngine.refreshMap();
+            },
+
+            updateLegend: () => {
+                const title = document.getElementById('legend-title');
+                const grid = document.getElementById('legend-grid');
+                if(ClientState.mapMode === 'POLITICAL') {
+                    title.innerText = "Intensidade do Vencedor";
+                    grid.style.background = 'linear-gradient(90deg, rgba(139, 148, 158, 0.3) 0%, rgba(139, 148, 158, 1) 100%)';
+                    document.getElementById('leg-min').innerText = "≤30%";
+                    document.getElementById('leg-max').innerText = "100%";
+                } else {
+                    title.innerText = "Renda Per Capita (CSV)";
+                    grid.style.background = 'linear-gradient(90deg, var(--red) 0%, var(--gold) 50%, var(--green) 100%)';
+                    document.getElementById('leg-min').innerText = "Baixa (<300)";
+                    document.getElementById('leg-max').innerText = "Alta (>500)";
+                }
+            },
+
+            resetMapToNational: () => {
+                MapEngine.loadNational();
+                MapEngine.map.setView([-15, -50], 4);
+                ClientState.activeScope = 'ESTADOS';
+                ClientState.activeUF = null;
+                document.getElementById('btn-back-map').style.display = 'none';
+                document.getElementById('right-panel').style.display = 'none';
+            },
+
+            showCityPanel: async (id, name, isState = false) => {
+                document.getElementById('right-panel').style.display = 'flex';
+                document.getElementById('rp-title').innerText = name;
+                document.getElementById('rp-subtitle').innerText = isState ? 'ESTADO' : 'MUNICÍPIO';
+                
+                // Tab Eleição
+                let res = isState ? ClientState.elections.states[id] : (ClientState.elections.municipalities[id] || ClientState.elections.states[ClientState.activeUF]);
+                if(res) {
+                    let html = `<div style="margin-bottom:15px; text-align:center; background:#21262d; padding:10px; border-radius:8px; border:1px solid var(--border);"><div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Votos Totais Projetados</div><div style="font-size:22px; font-weight:900; color:#fff;">Simulado Localmente</div></div>`;
+                    let ranking = res.ranking || [res.winner];
+                    ranking.forEach(r => {
+                        let c = Config.colors[r.id] || '#888';
+                        html += `<div class="cand-row"><div class="cand-color" style="background:${c}"></div><div class="cand-info"><div class="cand-head"><span>${r.id}</span><span style="color:${c}">${r.pct.toFixed(1)}%</span></div><div class="progress-bar"><div class="progress-fill" style="width:${r.pct}%; background:${c}"></div></div></div></div>`;
+                    });
+                    document.getElementById('local-results-list').innerHTML = html;
+                }
+
+                // Tab Economia (Puxa do CSV no Back-end)
+                const eco = document.getElementById('socio-data-container');
+                if(isState) {
+                    eco.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);">Selecione um município específico para ver dados do IBGE/CSV.</div>`;
+                } else {
+                    eco.innerHTML = `<div style="text-align:center; padding:20px;"><i class="fas fa-circle-notch fa-spin"></i> Buscando na API...</div>`;
+                    let data = await API.getCityData(id);
+                    if(data) {
+                        eco.innerHTML = `
+                            <div class="data-grid">
+                                <div class="data-card"><div class="data-card-title">População</div><div class="data-card-val">${parseInt(data.popTotal).toLocaleString()}</div></div>
+                                <div class="data-card"><div class="data-card-title">Renda per Capita</div><div class="data-card-val" style="color:var(--green)">R$ ${data.renda}</div></div>
+                                <div class="data-card"><div class="data-card-title">Índice IFDM</div><div class="data-card-val" style="color:var(--blue)">${data.ifdm}</div></div>
+                                <div class="data-card"><div class="data-card-title">Analfabetismo</div><div class="data-card-val" style="color:var(--red)">${data.analfabetismo}%</div></div>
+                                <div class="data-card"><div class="data-card-title">Rede de Esgoto</div><div class="data-card-val">${data.esgoto}%</div></div>
+                                <div class="data-card"><div class="data-card-title">Bolsa Família</div><div class="data-card-val" style="color:var(--gold)">${parseInt(data.bolsaF).toLocaleString()} hab.</div></div>
+                            </div>
+                        `;
+                        // Se estivermos na visão econômica, atualiza o mapa agora que temos o dado em cache
+                        if(ClientState.mapMode === 'SOCIOECONOMIC') MapEngine.refreshMap();
+                    } else {
+                        eco.innerHTML = `<div style="text-align:center; padding:20px; color:var(--red);">Dados não encontrados no servidor para este ID (${id}).</div>`;
+                    }
+                }
+            },
+
+            // --- Paineis e Abas ---
+            togglePanel: (id) => {
+                let el = document.getElementById(id);
+                el.style.display = (el.style.display === 'none' || el.style.display === '') ? 'flex' : 'none';
+            },
+
+            switchTab: (tabId) => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                event.currentTarget.classList.add('active');
+                document.getElementById('tab-' + tabId).classList.add('active');
+            },
+
+            openModal: async (type) => {
+                document.getElementById('action-modal').style.display = 'flex';
+                const body = document.getElementById('am-body');
+                const title = document.getElementById('am-title');
+                
+                if(type === 'laws') {
+                    title.innerHTML = '<i class="fas fa-gavel"></i> Plenário: Projetos de Lei';
+                    body.innerHTML = '<div style="text-align:center;"><i class="fas fa-spinner fa-spin"></i> Carregando leis do servidor...</div>';
+                    let laws = await API.getLaws();
+                    body.innerHTML = laws.map(l => `
+                        <div class="cand-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+                            <div style="font-weight:900; font-size:18px; color:#fff;">${l.name}</div>
+                            <div style="font-size:13px; color:var(--text-muted);">${l.desc}</div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px;">
+                                <div style="display:flex; gap:15px; font-size:14px; font-weight:bold;">
+                                    <span style="color:#f1c27d"><i class="fas fa-hand-fist"></i> ${l.costPP} PP</span>
+                                    <span style="color:var(--green)"><i class="fas fa-money-bill-wave"></i> R$ ${l.costM}M</span>
+                                </div>
+                                <button class="action-btn" onclick="API.proposeLaw('${l.id}')" style="background:var(--blue); color:#000; border:none;"><i class="fas fa-play"></i> Levar à Votação</button>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    title.innerHTML = 'Área Restrita';
+                    body.innerHTML = '<div style="color:var(--text-muted); text-align:center;">Requer implementação de mod no back-end.</div>';
+                }
+            },
+
+            closeModal: () => document.getElementById('action-modal').style.display = 'none',
+
+            // --- Animações ---
+            animatePlenario: (result) => {
+                document.getElementById('am-title').innerHTML = '<i class="fas fa-university"></i> Votação em Andamento';
+                document.getElementById('am-body').innerHTML = `
+                    <div class="plenario-screen">
+                        <div style="font-size:20px; font-weight:900; color:#fff; margin-bottom:20px;">VOTOS DOS DEPUTADOS</div>
+                        <div class="vote-grid">
+                            <div class="vote-box sim"><div style="color:var(--green); font-weight:bold;">SIM</div><div class="vote-num" id="v-sim" style="color:var(--green)">000</div></div>
+                            <div class="vote-box abs"><div style="color:var(--text-muted); font-weight:bold;">ABSTENÇÃO</div><div class="vote-num" id="v-abs" style="color:var(--text-muted)">000</div></div>
+                            <div class="vote-box nao"><div style="color:var(--red); font-weight:bold;">NÃO</div><div class="vote-num" id="v-nao" style="color:var(--red)">000</div></div>
+                        </div>
+                    </div>
+                `;
+
+                let cS = 0, cN = 0, cA = 0;
+                let iv = setInterval(() => {
+                    cS += Math.ceil(result.sim / 20); cN += Math.ceil(result.nao / 20); cA += Math.ceil(result.abs / 20);
+                    if(cS >= result.sim) cS = result.sim; if(cN >= result.nao) cN = result.nao; if(cA >= result.abs) cA = result.abs;
+                    
+                    document.getElementById('v-sim').innerText = cS.toString().padStart(3,'0');
+                    document.getElementById('v-nao').innerText = cN.toString().padStart(3,'0');
+                    document.getElementById('v-abs').innerText = cA.toString().padStart(3,'0');
+
+                    if(cS === result.sim && cN === result.nao && cA === result.abs) {
+                        clearInterval(iv);
+                        setTimeout(() => {
+                            if(result.passed) UI.toast("Projeto Aprovado!", "success");
+                            else UI.toast("Projeto Rejeitado pela oposição.", "error");
+                            API.getGameState(); // Atualiza painel com os novos custos debitados
+                            UI.closeModal();
+                        }, 2000);
+                    }
+                }, 100);
+            },
+
+            animateApuracao: () => {
+                UI.openModal('apuracao');
+                document.getElementById('am-title').innerHTML = '<i class="fas fa-balance-scale"></i> Tribunal Superior Eleitoral';
+                document.getElementById('am-body').innerHTML = `
+                    <div style="text-align:center; padding: 40px 20px;">
+                        <i class="fas fa-boxes fa-4x" style="color:var(--text-muted); margin-bottom:20px;"></i>
+                        <div style="font-size:22px; font-weight:900; color:#fff;">Apuração Nacional em Tempo Real</div>
+                        <div class="progress-container"><div class="progress-bar-fill" id="elec-bar"></div></div>
+                        <div id="elec-pct" style="margin-top:10px; font-size:28px; font-weight:900; font-family:monospace; color:var(--blue);">0.00%</div>
+                    </div>
+                `;
+
+                let bar = document.getElementById('elec-bar'), text = document.getElementById('elec-pct'), pct = 0;
+                let int = setInterval(() => {
+                    pct += Math.random() * 5 + 2;
+                    if(pct >= 100) { pct = 100; clearInterval(int); }
+                    bar.style.width = pct + '%'; text.innerText = pct.toFixed(2) + '%';
+                }, 100);
+            }
+        };
+
+        // ================= INICIALIZAÇÃO =================
+        window.onload = async () => {
+            await API.getGameState();
+            await API.getElections();
+            await MapEngine.init();
+        };
     </script>
-
-    <!-- Font Awesome 6 -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <!-- Leaflet JS (Map Engine) -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <!-- D3.js (Para renderização do Plenário) -->
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css">
-</head>
-<body class="bg-gov-900 text-slate-200 h-screen w-screen overflow-hidden flex font-sans selection:bg-gov-accent selection:text-white">
-
-    <!-- Left Sidebar -->
-    <aside class="w-64 bg-gov-800 border-r border-gov-700 flex flex-col shadow-2xl z-20">
-        <div class="p-6 flex items-center gap-3 border-b border-gov-700">
-            <div class="w-10 h-10 bg-gov-accent rounded-full flex items-center justify-center text-gov-900 shadow-lg shadow-gov-accent/20">
-                <i class="fa-solid fa-flag"></i>
-            </div>
-            <div>
-                <h1 class="font-bold text-lg leading-tight tracking-wide">E-Sim Brasil</h1>
-                <p class="text-xs text-slate-400">v1.0.0 Alpha</p>
-            </div>
-        </div>
-
-        <nav class="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
-            <button onclick="uiManager.switchView('map')" class="nav-btn active group">
-                <i class="fa-solid fa-map-marked-alt text-lg w-6 group-hover:text-gov-accent transition-colors"></i>
-                <span class="font-medium">Mapa Nacional</span>
-            </button>
-            <button onclick="uiManager.switchView('congress')" class="nav-btn group">
-                <i class="fa-solid fa-landmark text-lg w-6 group-hover:text-gov-accent transition-colors"></i>
-                <span class="font-medium">Congresso Nacional</span>
-            </button>
-            <button onclick="uiManager.switchView('party')" class="nav-btn group">
-                <i class="fa-solid fa-users text-lg w-6 group-hover:text-gov-accent transition-colors"></i>
-                <span class="font-medium">Meu Partido</span>
-            </button>
-            <button onclick="uiManager.switchView('executive')" class="nav-btn group">
-                <i class="fa-solid fa-briefcase text-lg w-6 group-hover:text-gov-accent transition-colors"></i>
-                <span class="font-medium">Executivo</span>
-            </button>
-            <button onclick="uiManager.switchView('stf')" class="nav-btn group">
-                <i class="fa-solid fa-scale-balanced text-lg w-6 group-hover:text-gov-accent transition-colors"></i>
-                <span class="font-medium">Suprema Corte</span>
-            </button>
-            <button onclick="uiManager.switchView('elections')" class="nav-btn group">
-                <i class="fa-solid fa-check-to-slot text-lg w-6 group-hover:text-gov-accent transition-colors"></i>
-                <span class="font-medium">Eleições</span>
-            </button>
-        </nav>
-
-        <div class="p-4 border-t border-gov-700">
-            <label class="block text-xs text-slate-400 mb-2 uppercase tracking-wider font-semibold">Modding & Save</label>
-            <div class="flex gap-2">
-                <button onclick="gameEngine.saveGame()" class="flex-1 bg-gov-700 hover:bg-gov-600 text-xs py-2 rounded-md transition-all" title="Salvar Jogo">
-                    <i class="fa-solid fa-save"></i>
-                </button>
-                <label class="flex-1 bg-gov-700 hover:bg-gov-600 text-xs py-2 rounded-md transition-all cursor-pointer text-center flex items-center justify-center" title="Carregar Mod (JSON)">
-                    <i class="fa-solid fa-file-import"></i>
-                    <input type="file" id="mod-upload" accept=".json" class="hidden" onchange="modSystem.loadMod(event)">
-                </label>
-            </div>
-        </div>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="flex-1 flex flex-col h-full relative">
-        
-        <!-- Top Bar -->
-        <header class="h-16 bg-gov-800/80 backdrop-blur-md border-b border-gov-700 flex items-center justify-between px-6 z-10 shadow-sm">
-            <div class="flex items-center gap-6">
-                <div class="flex items-center gap-2 text-slate-300">
-                    <i class="fa-regular fa-calendar-alt text-gov-accent"></i>
-                    <span id="ui-date" class="font-mono text-sm font-medium">01 Jan 2026</span>
-                </div>
-                <div class="flex items-center gap-2 text-slate-300">
-                    <i class="fa-solid fa-money-bill-wave text-green-500"></i>
-                    <span id="ui-budget" class="font-mono text-sm font-medium">R$ 1.50 Tri</span>
-                </div>
-                <div class="flex items-center gap-2 text-slate-300">
-                    <i class="fa-solid fa-chart-line text-blue-400"></i>
-                    <div class="flex flex-col">
-                        <span class="text-[10px] leading-none text-slate-400 uppercase tracking-wider">Aprovação</span>
-                        <span id="ui-approval" class="font-mono text-sm font-medium">45%</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="flex items-center gap-4">
-                <button onclick="gameEngine.nextTurn()" class="bg-gov-accent hover:bg-emerald-400 text-gov-900 px-4 py-2 rounded-md font-bold text-sm shadow-lg shadow-gov-accent/20 transition-all flex items-center gap-2">
-                    <i class="fa-solid fa-forward-step"></i> Avançar Turno
-                </button>
-                <button class="text-slate-400 hover:text-white transition-colors">
-                    <i class="fa-solid fa-cog text-xl"></i>
-                </button>
-            </div>
-        </header>
-
-        <!-- Dynamic Views Container -->
-        <div id="view-container" class="flex-1 relative overflow-hidden">
-            
-            <!-- View: MAP -->
-            <div id="view-map" class="view-panel active h-full w-full relative">
-                <div id="leaflet-map" class="h-full w-full z-0"></div>
-                <!-- Map Overlay Controls -->
-                <div class="absolute top-4 right-4 z-[400] bg-gov-800/90 backdrop-blur-md p-4 rounded-lg border border-gov-700 shadow-xl w-64">
-                    <h3 class="font-bold text-sm mb-3 border-b border-gov-700 pb-2"><i class="fa-solid fa-layer-group mr-2"></i>Camadas do Mapa</h3>
-                    <select id="map-layer-select" class="w-full bg-gov-900 border border-gov-700 rounded p-2 text-sm focus:ring-1 focus:ring-gov-accent outline-none" onchange="mapSystem.changeLayer(this.value)">
-                        <option value="political">Domínio Político</option>
-                        <option value="idh">Índice de Desenv. Humano (IDH)</option>
-                        <option value="pib">PIB per Capita</option>
-                        <option value="approval">Aprovação do Governo</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- View: CONGRESS -->
-            <div id="view-congress" class="view-panel h-full w-full p-8 overflow-y-auto custom-scrollbar bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gov-800 to-gov-900">
-                <div class="max-w-6xl mx-auto flex flex-col gap-6">
-                    <div class="flex justify-between items-end">
-                        <div>
-                            <h2 class="text-3xl font-bold mb-1"><i class="fa-solid fa-landmark text-gov-accent mr-3"></i>Câmara dos Deputados</h2>
-                            <p class="text-slate-400">513 Assentos • Maioria Simples: 257 • PEC: 308</p>
-                        </div>
-                        <button onclick="parliamentSystem.openLawModal()" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded shadow-lg transition-all flex items-center gap-2">
-                            <i class="fa-solid fa-file-signature"></i> Propor Projeto de Lei
-                        </button>
-                    </div>
-
-                    <!-- Hemiciclo D3.js Container -->
-                    <div class="bg-gov-900/50 border border-gov-700 rounded-xl p-8 flex justify-center items-center relative min-h-[400px] shadow-inner">
-                        <div id="hemiciclo-container"></div>
-                        
-                        <!-- Tooltip do Deputado -->
-                        <div id="deputy-tooltip" class="absolute hidden bg-gov-800 border border-gov-600 rounded-lg shadow-2xl p-4 w-64 pointer-events-none z-50 transform -translate-x-1/2 -translate-y-full mt-[-10px]">
-                            <div class="flex items-center gap-3 border-b border-gov-700 pb-2 mb-2">
-                                <div class="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center text-xl overflow-hidden" id="tt-photo">
-                                    <i class="fa-solid fa-user-tie"></i>
-                                </div>
-                                <div>
-                                    <h4 class="font-bold text-sm leading-tight" id="tt-name">Nome do Deputado</h4>
-                                    <span class="text-xs font-bold px-2 py-0.5 rounded mt-1 inline-block" id="tt-party">PARTIDO</span>
-                                </div>
-                            </div>
-                            <div class="text-xs text-slate-300 space-y-1">
-                                <p><i class="fa-solid fa-compass mr-1"></i> Espectro: <span id="tt-ideology" class="text-white">Centro</span></p>
-                                <p><i class="fa-solid fa-shield-halved mr-1"></i> Integridade: <span id="tt-integrity" class="text-white">80%</span></p>
-                                <p><i class="fa-solid fa-bullhorn mr-1"></i> Oratória: <span id="tt-oratory" class="text-white">65%</span></p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Fila de Votação -->
-                    <div class="bg-gov-800 border border-gov-700 rounded-xl p-6">
-                        <h3 class="font-bold text-lg mb-4 border-b border-gov-700 pb-2"><i class="fa-solid fa-gavel mr-2"></i>Pauta de Votações</h3>
-                        <div id="voting-queue" class="space-y-3">
-                            <!-- Gerado dinamicamente -->
-                            <p class="text-sm text-slate-400 italic text-center py-4">Nenhum projeto em pauta no momento.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- View: PARTY, EXECUTIVE, STF, ELECTIONS (Placeholders detalhados) -->
-            <div id="view-party" class="view-panel h-full p-8 overflow-auto"><h2 class="text-3xl font-bold"><i class="fa-solid fa-users text-gov-accent mr-3"></i>Gestão Partidária</h2><p class="mt-4 text-slate-400">Controle o fundo eleitoral, alianças e expulse dissidentes. (Módulo em expansão)</p></div>
-            <div id="view-executive" class="view-panel h-full p-8 overflow-auto"><h2 class="text-3xl font-bold"><i class="fa-solid fa-briefcase text-gov-accent mr-3"></i>Ministérios & Orçamento</h2><p class="mt-4 text-slate-400">Defina o orçamento para Saúde, Educação, Segurança e Infraestrutura.</p></div>
-            <div id="view-stf" class="view-panel h-full p-8 overflow-auto"><h2 class="text-3xl font-bold"><i class="fa-solid fa-scale-balanced text-gov-accent mr-3"></i>Supremo Tribunal Federal</h2><p class="mt-4 text-slate-400">11 Ministros. Julgamentos de corrupção e cassação de mandatos.</p></div>
-            <div id="view-elections" class="view-panel h-full p-8 overflow-auto"><h2 class="text-3xl font-bold"><i class="fa-solid fa-check-to-slot text-gov-accent mr-3"></i>Sistema Eleitoral</h2><p class="mt-4 text-slate-400">Acompanhe pesquisas (Datafolha simulado) e gerencie sua campanha de rádio/TV.</p></div>
-
-        </div>
-    </main>
-
-    <!-- Modals Globais -->
-    
-    <!-- Modal: Propor Lei -->
-    <div id="modal-law" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[999] hidden flex justify-center items-center">
-        <div class="bg-gov-800 w-full max-w-lg rounded-xl border border-gov-700 shadow-2xl overflow-hidden transform scale-95 transition-transform duration-300">
-            <div class="p-5 border-b border-gov-700 bg-gov-900 flex justify-between items-center">
-                <h3 class="font-bold text-lg"><i class="fa-solid fa-file-signature text-gov-accent mr-2"></i>Redigir Nova Lei</h3>
-                <button onclick="parliamentSystem.closeLawModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
-            </div>
-            <div class="p-6 space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 mb-1">TIPO DE PROJETO</label>
-                    <select id="law-type" class="w-full bg-gov-900 border border-gov-700 rounded p-2 text-sm text-white outline-none focus:border-gov-accent">
-                        <option value="pl">Projeto de Lei Ordinária (PL) - Maioria Simples</option>
-                        <option value="plc">Projeto de Lei Complementar (PLC) - Maioria Absoluta</option>
-                        <option value="pec">Proposta de Emenda Const. (PEC) - 3/5</option>
-                        <option value="mp">Medida Provisória (MP) - Imediata</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 mb-1">TÍTULO DA PAUTA</label>
-                    <input type="text" id="law-title" placeholder="Ex: Reforma Tributária" class="w-full bg-gov-900 border border-gov-700 rounded p-2 text-sm text-white outline-none focus:border-gov-accent">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 mb-1">ALINHAMENTO IDEOLÓGICO DA PAUTA</label>
-                    <select id="law-alignment" class="w-full bg-gov-900 border border-gov-700 rounded p-2 text-sm text-white outline-none focus:border-gov-accent">
-                        <option value="esquerda">Foco Social / Estado Forte (Esquerda)</option>
-                        <option value="centro">Pragmático / Manutenção (Centro)</option>
-                        <option value="direita">Livre Mercado / Conservador (Direita)</option>
-                    </select>
-                </div>
-            </div>
-            <div class="p-5 border-t border-gov-700 bg-gov-900 flex justify-end gap-3">
-                <button onclick="parliamentSystem.closeLawModal()" class="px-4 py-2 rounded text-sm font-medium hover:bg-gov-700 transition-colors">Cancelar</button>
-                <button onclick="parliamentSystem.submitLaw()" class="px-4 py-2 bg-gov-accent text-gov-900 rounded text-sm font-bold hover:bg-emerald-400 transition-colors shadow-lg shadow-gov-accent/20">Enviar ao Plenário</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Evento / Crise -->
-    <div id="modal-event" class="fixed inset-0 bg-black/80 backdrop-blur-md z-[1000] hidden flex justify-center items-center">
-        <div class="bg-gov-800 w-full max-w-md rounded-xl border-t-4 border-red-500 shadow-2xl overflow-hidden text-center">
-            <div class="p-8">
-                <div class="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-4">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
-                </div>
-                <h2 id="event-title" class="text-2xl font-bold mb-2">Crise Global</h2>
-                <p id="event-desc" class="text-slate-300 text-sm mb-6">A bolsa despencou. O mercado exige medidas imediatas.</p>
-                <div class="flex justify-center gap-4" id="event-actions">
-                    <button onclick="gameEngine.closeEvent()" class="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded font-medium transition-colors">Entendido</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Main Logic Script -->
-    <script src="app.js"></script>
 </body>
 </html>
